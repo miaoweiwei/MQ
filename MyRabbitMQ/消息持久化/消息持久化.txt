@@ -1,0 +1,17 @@
+当RabbitMQ Server 关闭或者崩溃，那么里面存储的队列和消息默认是不会保存下来的。如果要让RabbitMQ保存住消息，需要在两个地方同时设置：需要保证队列和消息都是持久化的。
+
+首先，要保证RabbitMQ不会丢失队列，所以要做如下设置：
+
+bool durable = true;
+channel.QueueDeclare("hello", durable, false, false, null);
+虽然在语法上是正确的，但是在目前阶段是不正确的，因为我们之前已经定义了一个非持久化的hello队列。RabbitMQ不允许我们使用不同的参数重新定义一个已经存在的同名队列，如果这样做就会报错。现在，定义另外一个不同名称的队列：
+
+bool durable = true;
+channel.queueDeclare("task_queue", durable, false, false, null);
+queueDeclare 这个改动需要在发送端和接收端同时设置。
+
+现在保证了task_queue这个消息队列即使在RabbitMQ Server重启之后，队列也不会丢失。 然后需要保证消息也是持久化的， 这可以通过设置IBasicProperties.SetPersistent 为true来实现：
+
+var properties = channel.CreateBasicProperties();
+properties.SetPersistent(true);
+需要注意的是，将消息设置为持久化并不能完全保证消息不丢失。虽然他告诉RabbitMQ将消息保存到磁盘上，但是在RabbitMQ接收到消息和将其保存到磁盘上这之间仍然有一个小的时间窗口。 RabbitMQ 可能只是将消息保存到了缓存中，并没有将其写入到磁盘上。持久化是不能够一定保证的，但是对于一个简单任务队列来说已经足够。如果需要消息队列持久化的强保证，可以使用publisher confirms
